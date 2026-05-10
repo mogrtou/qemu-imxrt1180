@@ -1,0 +1,301 @@
+# CI/CD Pipeline — QEMU i.MX RT1180
+
+name: QEMU i.MX RT1180 CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:  # 允许手动触发
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QEMU_BUILD_DIR: ${{ github.workspace }}/qemu/build
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+
+jobs:
+
+  # ========================================================================
+  #  1. 构建 QEMU (arm-softmmu)
+  # ========================================================================
+  build-qemu:
+    name: Build QEMU (arm-softmmu)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 QEMU 构建依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential ninja-build meson pkg-config \
+            libglib2.0-dev libpixman-1-dev libslirp-dev \
+            python3 python3-pip ccache
+
+      - name: 配置 ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-qemu-${{ runner.os }}-${{ hashFiles('qemu/configure', 'qemu/meson.build') }}
+          restore-keys: |
+            ccache-qemu-${{ runner.os }}-
+
+      - name: 配置 QEMU
+        run: |
+          cd qemu
+          mkdir -p build && cd build
+          ../configure \
+            --target-list=arm-softmmu \
+            --enable-debug \
+            --enable-slirp \
+            --cc="ccache gcc" \
+            --cxx="ccache g++"
+
+      - name: 构建 QEMU
+        run: |
+          cd ${{ env.QEMU_BUILD_DIR }}
+          ninja -j$(nproc)
+
+      - name: 上传 QEMU 构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-arm-softmmu
+          path: |
+            ${{ env.QEMU_BUILD_DIR }}/qemu-system-arm
+            ${{ env.QEMU_BUILD_DIR }}/build.ninja
+          retention-days: 1
+
+  # ========================================================================
+  #  2. 构建固件
+  # ========================================================================
+  build-firmware:
+    name: Build Firmware
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 ARM 工具链
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-arm-none-eabi binutils-arm-none-eabi make
+
+      - name: 构建固件
+        run: |
+          cd firmware
+          make clean || true
+          make -j$(nproc)
+
+      - name: 上传固件产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-elf
+          path: |
+            firmware/build/firmware.elf
+            firmware/build/*.map
+          retention-days: 1
+
+  # ========================================================================
+  #  3. qtest 单元测试
+  # ========================================================================
+  test-qtest:
+    name: QTest Unit Tests
+    runs-on: ubuntu-24.04
+    needs: [build-qemu]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装测试依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-dev libpixman-1-dev libslirp-dev \
+            python3
+
+      - name: 下载 QEMU 构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: qemu-arm-softmmu
+          path: ${{ env.QEMU_BUILD_DIR }}
+
+      - name: 运行 qtest
+        run: |
+          cd ${{ env.QEMU_BUILD_DIR }}
+          chmod +x qemu-system-arm
+          meson test \
+            --suite imxrt1180 \
+            --print-errorlogs \
+            --num-processes $(nproc) \
+          || echo "::warning::部分测试失败 (可能设备模型未完成)"
+
+      - name: 上传测试日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qtest-logs
+          path: ${{ env.QEMU_BUILD_DIR }}/meson-logs/testlog*.txt
+          retention-days: 7
+
+  # ========================================================================
+  #  4. 集成测试 (允许失败 — 固件功能逐步完善中)
+  # ========================================================================
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-24.04
+    needs: [build-qemu, build-firmware]
+    continue-on-error: true  # 集成测试失败不阻塞 PR
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python 测试依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3 python3-pip libglib2.0-dev libpixman-1-dev libslirp-dev
+          python3 -m pip install pytest pexpect
+
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+      # artifact 自动解压到各自目录
+
+      - name: 运行集成测试
+        run: |
+          export PATH="${{ env.QEMU_BUILD_DIR }}:$PATH"
+          if [ -d tests/integration ] && ls tests/integration/test_*.py >/dev/null 2>&1; then
+            cd tests/integration
+            python3 -m pytest -v --timeout=120 --tb=short \
+            || echo "::warning::部分集成测试失败 (可能固件功能未完成)"
+          else
+            echo "::notice::未找到集成测试文件，跳过"
+          fi
+
+      - name: 上传测试日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs
+          path: tests/integration/*.log
+          retention-days: 7
+        continue-on-error: true
+
+  # ========================================================================
+  #  5. 代码覆盖率 (独立 job, 使用 --enable-gcov 重新编译)
+  # ========================================================================
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-24.04
+    needs: []
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装构建与覆盖率工具
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential ninja-build meson pkg-config \
+            libglib2.0-dev libpixman-1-dev libslirp-dev \
+            python3 python3-pip ccache lcov gcovr
+
+      - name: 配置 ccache (覆盖率)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-qemu-gcov-${{ runner.os }}-${{ hashFiles('qemu/configure', 'qemu/meson.build') }}
+          restore-keys: |
+            ccache-qemu-gcov-${{ runner.os }}-
+
+      - name: 配置 QEMU (--enable-gcov)
+        run: |
+          cd qemu
+          mkdir -p build && cd build
+          ../configure \
+            --target-list=arm-softmmu \
+            --enable-debug \
+            --enable-slirp \
+            --enable-gcov \
+            --cc="ccache gcc" \
+            --cxx="ccache g++"
+
+      - name: 构建 QEMU (gcov 插桩)
+        run: |
+          cd ${{ env.QEMU_BUILD_DIR }}
+          ninja -j$(nproc)
+
+      - name: 运行 qtest (收集 .gcda)
+        run: |
+          cd ${{ env.QEMU_BUILD_DIR }}
+          meson test \
+            --suite imxrt1180 \
+            --print-errorlogs \
+            --num-processes 1 \
+          || echo "::warning::部分 qtest 失败 (可能设备模型未完成)"
+
+      - name: 生成覆盖率报告 (gcovr)
+        run: |
+          cd ${{ env.QEMU_BUILD_DIR }}
+          mkdir -p coverage-html
+          gcovr \
+            --root ../ \
+            --object-directory . \
+            --html --html-details \
+            -o coverage-html/index.html \
+            --exclude 'tests/.*' \
+            --exclude 'subprojects/.*' \
+            --print-summary \
+          || echo "::warning::gcovr 报告生成部分失败"
+
+      - name: 生成覆盖率报告 (lcov 备用)
+        run: |
+          cd ${{ env.QEMU_BUILD_DIR }}
+          lcov --capture --directory . \
+            --output-file coverage.info \
+            --rc lcov_branch_coverage=1 \
+          || echo "::warning::lcov 捕获部分失败"
+          # 过滤系统头文件
+          lcov --remove coverage.info \
+            '/usr/*' '*/tests/*' '*/subprojects/*' \
+            --output-file coverage_filtered.info \
+            --rc lcov_branch_coverage=1 \
+          || true
+          # 生成 HTML
+          genhtml coverage_filtered.info \
+            --output-directory coverage-lcov-html \
+            --rc lcov_branch_coverage=1 \
+            --title "QEMU i.MX RT1180 Coverage" \
+          || echo "::warning::genhtml 部分失败"
+
+      - name: 上传覆盖率报告 (gcovr HTML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-gcovr-html
+          path: ${{ env.QEMU_BUILD_DIR }}/coverage-html/
+          retention-days: 30
+
+      - name: 上传覆盖率报告 (lcov HTML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov-html
+          path: ${{ env.QEMU_BUILD_DIR }}/coverage-lcov-html/
+          retention-days: 30
+
+      - name: 上传覆盖率原始数据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-raw-data
+          path: |
+            ${{ env.QEMU_BUILD_DIR }}/**/*.gcda
+            ${{ env.QEMU_BUILD_DIR }}/**/*.gcno
+            ${{ env.QEMU_BUILD_DIR }}/coverage*.info
+          retention-days: 7

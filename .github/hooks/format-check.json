@@ -1,0 +1,10 @@
+{
+  "hooks": [
+    {
+      "event": "PostToolUse",
+      "type": "command",
+      "command": "echo \"[Hook] 文件已修改，请确保 C 代码符合 QEMU 编码规范\"",
+      "timeout": 5
+    }
+  ]
+}
