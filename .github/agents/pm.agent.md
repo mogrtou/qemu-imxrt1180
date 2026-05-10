@@ -1,6 +1,11 @@
 ---
 description: "Use when: user has a new feature request, requirement is vague/ambiguous, needs PRD/user stories, wants to define milestones. Product Manager — requirements analysis and user dialogue."
-tools: [read, search, todo]
+tools: [read, search, todo, write, edit]
+toolRestrictions:
+  write:
+    allowedPaths: ["docs/**", ".github/**"]
+  edit:
+    allowedPaths: ["docs/**", ".github**"]
 user-invocable: true
 argument-hint: "What requirement or feature would you like to clarify?"
 ---

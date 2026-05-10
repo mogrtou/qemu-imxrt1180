@@ -1,6 +1,9 @@
 ---
 description: "Use when: writing embedded C firmware, startup code, linker scripts, vector tables, or test firmware that runs on the simulated i.MX RT1180 MCU."
-tools: [read, edit, search]
+tools: [read, edit, search, execute]
+toolRestrictions:
+  edit:
+    allowedPaths: ["firmware/**"]
 user-invocable: true
 argument-hint: "What firmware component should I write?"
 ---

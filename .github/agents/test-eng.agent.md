@@ -1,6 +1,9 @@
 ---
 description: "Use when: writing tests (qtest, Python integration, HIL), test case design, coverage analysis, or verifying QEMU device model behavior against spec."
 tools: [read, edit, search]
+toolRestrictions:
+  edit:
+    allowedPaths: ["tests/**"]
 user-invocable: true
 argument-hint: "What should I test? Which test layer?"
 ---
