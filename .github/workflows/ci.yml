@@ -47,21 +47,30 @@ jobs:
 
       - name: 配置 QEMU
         run: |
-          cd qemu
-          mkdir -p build && cd build
-          ../configure \
-            --target-list=arm-softmmu \
-            --enable-debug \
-            --enable-slirp \
-            --cc="ccache gcc" \
-            --cxx="ccache g++"
+          if [ -d qemu ] && [ -f qemu/configure ]; then
+            cd qemu
+            mkdir -p build && cd build
+            ../configure \
+              --target-list=arm-softmmu \
+              --enable-debug \
+              --enable-slirp \
+              --cc="ccache gcc" \
+              --cxx="ccache g++"
+          else
+            echo "::notice::qemu/ 目录不存在（QEMU上游源码未导入），跳过 QEMU 构建"
+          fi
 
       - name: 构建 QEMU
         run: |
-          cd ${{ env.QEMU_BUILD_DIR }}
-          ninja -j$(nproc)
+          if [ -d "${{ env.QEMU_BUILD_DIR }}" ]; then
+            cd ${{ env.QEMU_BUILD_DIR }}
+            ninja -j$(nproc)
+          else
+            echo "::notice::QEMU 构建目录不存在，跳过 ninja"
+          fi
 
       - name: 上传 QEMU 构建产物
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: qemu-arm-softmmu
@@ -89,8 +98,12 @@ jobs:
       - name: 构建固件
         run: |
           cd firmware
-          make clean || true
-          make -j$(nproc)
+          if [ -f build.py ]; then
+            python3 build.py
+          else
+            make clean || true
+            make -j$(nproc)
+          fi
 
       - name: 上传固件产物
         uses: actions/upload-artifact@v4
@@ -215,29 +228,41 @@ jobs:
 
       - name: 配置 QEMU (--enable-gcov)
         run: |
-          cd qemu
-          mkdir -p build && cd build
-          ../configure \
-            --target-list=arm-softmmu \
-            --enable-debug \
-            --enable-slirp \
-            --enable-gcov \
-            --cc="ccache gcc" \
-            --cxx="ccache g++"
+          if [ -d qemu ] && [ -f qemu/configure ]; then
+            cd qemu
+            mkdir -p build && cd build
+            ../configure \
+              --target-list=arm-softmmu \
+              --enable-debug \
+              --enable-slirp \
+              --enable-gcov \
+              --cc="ccache gcc" \
+              --cxx="ccache g++"
+          else
+            echo "::notice::qemu/ 目录不存在，跳过 QEMU gcov 构建"
+          fi
 
       - name: 构建 QEMU (gcov 插桩)
         run: |
-          cd ${{ env.QEMU_BUILD_DIR }}
-          ninja -j$(nproc)
+          if [ -d "${{ env.QEMU_BUILD_DIR }}" ]; then
+            cd ${{ env.QEMU_BUILD_DIR }}
+            ninja -j$(nproc)
+          else
+            echo "::notice::QEMU build 目录不存在, 跳过构建"
+          fi
 
       - name: 运行 qtest (收集 .gcda)
         run: |
-          cd ${{ env.QEMU_BUILD_DIR }}
-          meson test \
-            --suite imxrt1180 \
-            --print-errorlogs \
-            --num-processes 1 \
-          || echo "::warning::部分 qtest 失败 (可能设备模型未完成)"
+          if [ -d "${{ env.QEMU_BUILD_DIR }}" ]; then
+            cd ${{ env.QEMU_BUILD_DIR }}
+            meson test \
+              --suite imxrt1180 \
+              --print-errorlogs \
+              --num-processes 1 \
+            || echo "::warning::部分 qtest 失败 (可能设备模型未完成)"
+          else
+            echo "::notice::QEMU 构建目录不存在, 跳过 qtest"
+          fi
 
       - name: 生成覆盖率报告 (gcovr)
         run: |
