@@ -71,3 +71,20 @@ f:\qemu-imxrt1180\
 - PM → Architect: `docs/prd.md`
 - Architect → 开发团队: `docs/architecture.md` + `docs/interfaces.md`
 - 有问题时在文档中标注 "NEEDS CLARIFICATION"
+
+## Agent 记忆系统 (2026-05-10 生效)
+
+### 规则
+1. **每次 Agent 启动必须首先读取自己的记忆文件** (`.github/memories/repo/<agent>-context.md`)，恢复之前的上下文
+2. **每次完成阶段性工作后必须更新记忆文件**，记录当前进度、待办项、已知问题
+3. **关键决策必须写入记忆**，供后续恢复参考
+
+### 记忆文件位置
+| Agent | 记忆文件 |
+|-------|----------|
+| PM | `.github/memories/repo/pm-context.md` |
+| Architect | `.github/memories/repo/architect-context.md` |
+| QEMU Dev | `.github/memories/repo/qemu-dev-context.md` |
+| FW Dev | `.github/memories/repo/fw-dev-context.md` |
+| Test Eng | `.github/memories/repo/test-eng-context.md` |
+| DevOps | `.github/memories/repo/devops-context.md` |

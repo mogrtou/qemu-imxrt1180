@@ -1,6 +1,9 @@
 ---
 description: "Use when: setting up build system, Docker containers, CI/CD pipelines, GitHub Actions, Meson configuration, cross-compilation toolchains, or automating test execution."
 tools: [read, edit, search, execute]
+toolRestrictions:
+  edit:
+    allowedPaths: [".github/workflows/**", "Dockerfile", "docker-compose.yml", "qemu/**/meson.build", "firmware/Makefile", "firmware/build.py", "tests/**/meson.build"]
 user-invocable: true
 argument-hint: "What infrastructure or pipeline should I set up?"
 ---
