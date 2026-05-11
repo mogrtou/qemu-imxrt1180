@@ -29,6 +29,29 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
+      - name: Clone QEMU upstream
+        run: |
+          if [ ! -d qemu ]; then
+            git clone --depth 1 --branch v9.2.0 \
+              https://github.com/qemu/qemu.git qemu
+          else
+            echo "qemu/ 已存在，跳过 clone"
+          fi
+
+      - name: 链接设备模型源码
+        run: |
+          # 将我们的 .c/.h 文件软链接或拷贝到 QEMU 树中
+          cp -r hw/arm/imxrt1180_*.c qemu/hw/arm/
+          cp -r hw/net/imxrt1180_*.c qemu/hw/net/
+          cp -r include/hw/arm/imxrt1180_*.h qemu/include/hw/arm/
+          cp -r include/hw/net/imxrt1180_*.h qemu/include/hw/net/
+          # 合并 meson.build
+          cat hw/arm/meson.build >> qemu/hw/arm/meson.build
+          cat hw/net/meson.build >> qemu/hw/net/meson.build
+          cat tests/qtest/meson.build >> qemu/tests/qtest/meson.build
+          # 拷贝 qtest 源文件
+          cp tests/qtest/imxrt1180-*.c qemu/tests/qtest/
+
       - name: 安装 QEMU 构建依赖
         run: |
           sudo apt-get update
