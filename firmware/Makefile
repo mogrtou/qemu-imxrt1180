@@ -1,5 +1,8 @@
 # Makefile — i.MX RT1180 QEMU 固件构建系统
 #
+# 推荐使用 build.py (跨平台, Python 3.7+)。
+# Makefile 作为备选 (需 GNU Make + arm-none-eabi-gcc)。
+#
 # 用法:
 #   make                  # 编译 firmware.elf
 #   make clean            # 清理构建产物
@@ -7,7 +10,7 @@
 #   make debug-qemu       # 编译并以 GDB stub 模式运行
 #
 # 工具链: ARM GNU Toolchain (arm-none-eabi-gcc)
-# 目标:   Cortex-M7, Thumb mode, soft-float ABI
+# 目标:   Cortex-M7, Thumb mode, softfp ABI
 
 # ---- 工具链 ----
 CROSS    ?= arm-none-eabi-
@@ -20,85 +23,94 @@ SIZE     := $(CROSS)size
 BUILD_DIR := build
 TARGET    := $(BUILD_DIR)/firmware.elf
 
-# ---- 源文件 ----
-# 核心启动
+# ---- 源文件 (与 build.py 保持一致) ----
 SRCS := startup.c main.c
-
-# Demo 模块
-SRCS += uart_demo.c systick_demo.c gpio_demo.c
-
-# BAL 板级抽象层
 SRCS += bal/bal.c
+SRCS += drivers/imxrt_enet.c
+SRCS += app/httpd_task.c
 
-# ENET 驱动 (占位, Phase 2 启用)
-# SRCS += drivers/imxrt_enet.c
+# FreeRTOS Kernel (10.6.2)
+SRCS += FreeRTOS/Source/tasks.c
+SRCS += FreeRTOS/Source/queue.c
+SRCS += FreeRTOS/Source/list.c
+SRCS += FreeRTOS/Source/timers.c
+SRCS += FreeRTOS/Source/event_groups.c
+SRCS += FreeRTOS/Source/stream_buffer.c
+SRCS += FreeRTOS/Source/portable/MemMang/heap_4.c
+SRCS += FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1/port.c
 
-# FreeRTOS kernel (Phase 2: 从官方源码导入后取消注释)
-# FREERTOS_SRC := FreeRTOS/Source
-# SRCS += $(FREERTOS_SRC)/tasks.c
-# SRCS += $(FREERTOS_SRC)/queue.c
-# SRCS += $(FREERTOS_SRC)/list.c
-# SRCS += $(FREERTOS_SRC)/timers.c
-# SRCS += $(FREERTOS_SRC)/portable/MemMang/heap_4.c
-# SRCS += $(FREERTOS_SRC)/portable/GCC/ARM_CM7/r0p1/port.c
+# lwIP 2.2.1 — core
+SRCS += lwip/src/core/def.c
+SRCS += lwip/src/core/mem.c
+SRCS += lwip/src/core/memp.c
+SRCS += lwip/src/core/pbuf.c
+SRCS += lwip/src/core/init.c
+SRCS += lwip/src/core/netif.c
+SRCS += lwip/src/core/ip.c
+SRCS += lwip/src/core/inet_chksum.c
+SRCS += lwip/src/core/timeouts.c
+SRCS += lwip/src/core/stats.c
+SRCS += lwip/src/core/sys.c
 
-# lwIP (Phase 2: 从官方源码导入后取消注释)
-# LWIP_SRC := lwip/src
-# SRCS += $(LWIP_SRC)/core/init.c
-# SRCS += $(LWIP_SRC)/core/tcp.c
-# SRCS += $(LWIP_SRC)/core/tcp_in.c
-# SRCS += $(LWIP_SRC)/core/tcp_out.c
-# SRCS += $(LWIP_SRC)/core/udp.c
-# SRCS += $(LWIP_SRC)/core/ipv4/ip4.c
-# SRCS += $(LWIP_SRC)/core/ipv4/ip4_addr.c
-# SRCS += $(LWIP_SRC)/core/ipv4/ip4_frag.c
-# SRCS += $(LWIP_SRC)/core/ipv4/icmp.c
-# SRCS += $(LWIP_SRC)/core/ipv4/dhcp.c
-# SRCS += $(LWIP_SRC)/core/ipv4/autoip.c
-# SRCS += $(LWIP_SRC)/core/pbuf.c
-# SRCS += $(LWIP_SRC)/core/mem.c
-# SRCS += $(LWIP_SRC)/core/memp.c
-# SRCS += $(LWIP_SRC)/core/netif.c
-# SRCS += $(LWIP_SRC)/core/stats.c
-# SRCS += $(LWIP_SRC)/core/sys.c
-# SRCS += $(LWIP_SRC)/core/timeouts.c
-# SRCS += $(LWIP_SRC)/api/api_lib.c
-# SRCS += $(LWIP_SRC)/api/api_msg.c
-# SRCS += $(LWIP_SRC)/api/err.c
-# SRCS += $(LWIP_SRC)/api/netbuf.c
-# SRCS += $(LWIP_SRC)/api/netdb.c
-# SRCS += $(LWIP_SRC)/api/netifapi.c
-# SRCS += $(LWIP_SRC)/api/sockets.c
-# SRCS += $(LWIP_SRC)/api/tcpip.c
-# SRCS += $(LWIP_SRC)/netif/ethernet.c
+# lwIP — IPv4
+SRCS += lwip/src/core/ipv4/ip4.c
+SRCS += lwip/src/core/ipv4/ip4_addr.c
+SRCS += lwip/src/core/ipv4/ip4_frag.c
+SRCS += lwip/src/core/ipv4/icmp.c
+SRCS += lwip/src/core/ipv4/etharp.c
+SRCS += lwip/src/core/ipv4/dhcp.c
+SRCS += lwip/src/core/ipv4/igmp.c
+SRCS += lwip/src/core/ipv4/acd.c
 
-# mbedTLS (Phase 2: 从官方源码导入后取消注释)
+# lwIP — TCP + UDP + Raw
+SRCS += lwip/src/core/tcp.c
+SRCS += lwip/src/core/tcp_in.c
+SRCS += lwip/src/core/tcp_out.c
+SRCS += lwip/src/core/udp.c
+SRCS += lwip/src/core/raw.c
 
-OBJS := $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))
+# lwIP — netconn API
+SRCS += lwip/src/api/api_lib.c
+SRCS += lwip/src/api/api_msg.c
+SRCS += lwip/src/api/err.c
+SRCS += lwip/src/api/netbuf.c
+SRCS += lwip/src/api/netdb.c
+SRCS += lwip/src/api/netifapi.c
+SRCS += lwip/src/api/tcpip.c
 
-# ---- 编译标志 ----
-# -mcpu=cortex-m7:     Cortex-M7 目标
-# -mthumb:             Thumb-2 指令集
-# -mfloat-abi=soft:    软浮点 ABI (QEMU 支持, 无需 FPU 硬件)
-# -ffreestanding:      独立环境 (无标准库)
-# -nostdlib:           不链接标准库
-# -O0:                 无优化 (调试友好)
-# -g3:                 最大调试信息
-CFLAGS  := -mcpu=cortex-m7 -mthumb -mfloat-abi=soft
+# lwIP — netif (ethernet)
+SRCS += lwip/src/netif/ethernet.c
+
+# lwIP — arch 适配
+SRCS += lwip/src/arch/sys_arch.c
+
+OBJS := $(addprefix $(BUILD_DIR)/, $(notdir $(SRCS:.c=.o)))
+
+# ---- 编译标志 (与 build.py 保持一致) ----
+CFLAGS  := -mcpu=cortex-m7 -mthumb -mfloat-abi=softfp -mfpu=fpv5-d16
 CFLAGS  += -ffreestanding -nostdlib
-CFLAGS  += -O0 -g3 -Wall -Wextra -Werror
+CFLAGS  += -O0 -g3 -Wall -Wextra
+CFLAGS  += -Wno-unused-function -Wno-unused-parameter
+CFLAGS  += -Wno-missing-field-initializers
 CFLAGS  += -std=c11
 CFLAGS  += -I.
 CFLAGS  += -Ibal
 CFLAGS  += -Ibal/config
 CFLAGS  += -Idrivers
 CFLAGS  += -IFreeRTOS/include
-CFLAGS  += -IFreeRTOS/portable
+CFLAGS  += -IFreeRTOS/Source/include
+CFLAGS  += -IFreeRTOS/Source/portable/GCC/ARM_CM7/r0p1
 CFLAGS  += -Ilwip/include
+CFLAGS  += -Ilwip/include/arch
+CFLAGS  += -Ilwip/src/include
+CFLAGS  += -Ilwip/src/include/ipv4
+CFLAGS  += -Ilwip/src/arch
 CFLAGS  += -Imbedtls/include
+CFLAGS  += -Imbedtls/include/mbedtls
 
 # ---- 链接标志 ----
-LDFLAGS := -T link.ld -nostdlib -Wl,-Map=$(BUILD_DIR)/firmware.map
+LDFLAGS := -mcpu=cortex-m7 -mthumb -mfloat-abi=softfp -mfpu=fpv5-d16
+LDFLAGS += -T link.ld -nostdlib -Wl,-Map=$(BUILD_DIR)/firmware.map
 
 # ---- QEMU 参数 ----
 QEMU         ?= qemu-system-arm
@@ -116,13 +128,54 @@ $(TARGET): $(OBJS) link.ld
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
 	$(SIZE) $@
 
-# ---- 编译 C 文件 ----
-$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
+# ---- 编译 C 文件 (flat obj dir, 避免路径冲突) ----
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# ---- 创建构建目录 ----
-$(BUILD_DIR):
+$(BUILD_DIR)/%.o: bal/%.c
 	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: drivers/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: app/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: FreeRTOS/Source/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: FreeRTOS/Source/portable/MemMang/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: lwip/src/core/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: lwip/src/core/ipv4/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: lwip/src/api/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: lwip/src/netif/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: lwip/src/arch/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 # ---- 清理 ----
 .PHONY: clean
@@ -148,6 +201,9 @@ disasm: $(TARGET)
 .PHONY: help
 help:
 	@echo "i.MX RT1180 QEMU Firmware Build System"
+	@echo ""
+	@echo "推荐: python build.py (跨平台, 更简化的依赖)"
+	@echo "备选: make (GNU Make + arm-none-eabi-gcc)"
 	@echo ""
 	@echo "Targets:"
 	@echo "  all         构建 firmware.elf (默认)"

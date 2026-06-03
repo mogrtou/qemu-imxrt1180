@@ -54,8 +54,8 @@ services:
         ninja
         echo "=== Stage 3: 构建固件 ==="
         cd /workspace/firmware
-        make clean || true
-        make
+        python3 build.py clean || true
+        python3 build.py
         echo "=== Stage 4: qtest 单元测试 ==="
         cd /workspace/qemu/build
         meson test --suite imxrt1180 --print-errorlogs || echo "WARNING: 部分测试失败 (可能设备模型未完成)"

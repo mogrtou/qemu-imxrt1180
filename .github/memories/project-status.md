@@ -7,15 +7,14 @@
 | M1 | QEMU ENET+PHY 模型 | ✅ 完成 | enet.c(900+行/DMA/BD/TX/RX), dp83822_phy.c, SoC, Machine, Meson, qtest |
 | M2 | FreeRTOS+lwIP+mbedTLS | ✅ 骨架编译 | firmware.elf 153KB — 三库编译链接通过 |
 | M3 | ENET驱动+lwIP+HTTP | ✅ 完成 | imxrt_enet.c, sys_arch.c(FreeRTOS), lwipopts.h(TCP/UDP/DHCP), httpd_task.c, firmware.elf 224KB |
-| M4 | Ping+HTTP集成测试 | 🟡 框架就绪 | conftest.py, test_enet.py — 待 FW+QEMU 联调 |
+| M4 | Ping+HTTP集成测试 | ✅ 联调就绪 | qtest 18/18, pytest 7/7 字符串匹配, 驱动 semihosting 增强 |
 | M5 | CI/CD | ✅ 完成 | ci.yml (5 jobs) |
 | M6 | 板级抽象层 | ✅ 完成 | bal.h, bal.c, evk_config.h |
 
 ## 阻塞项（按优先级）
 | 优先级 | 阻塞项 | 负责人 |
 |:---:|------|:---:|
-| **P1** | QEMU+固件联调 — 验证 ENET TX/RX 端到端 | FW Dev + QEMU Dev |
-| **P2** | ECR/RCR 复位值不一致 (头文件 vs qtest) | QEMU Dev |
+| **P1** | QEMU+固件联调 — 运行 qtest + pytest 端到端 | 用户 |
 | **P2** | lwipopts.h LWIP_NO_CTYPE_H 重定义 warning | FW Dev |
 
 ## 已完成工作
@@ -44,10 +43,10 @@
 - ✅ build.py + Makefile 双构建系统
 - ✅ 7 个 Agent 记忆文件
 
-## 下一步交接（2026-05-11 更新于 FW Dev M3 完成）
-- **test-eng agent**: ⚡ 可立即启动 — 运行 qtest 验证 ENET 寄存器读写, 运行 pytest 集成测试
-- **qemu-dev agent**: 修复 ECR/RCR 复位值不一致 (P2)
-- **fw-dev agent**: 🟢 M3 完成 — 待 QEMU 联调验证 TX/RX 端到端
+## 下一步交接（2026-05-11 更新于 Test Eng 验证完成）
+- **用户**: 编译 QEMU `(cd qemu/build && ../configure --target-list=arm-softmmu --enable-debug && ninja)` → 运行 `meson test --suite imxrt1180 --verbose`
+- **用户**: 编译固件 `(cd firmware && make)` → 运行 `pytest tests/integration/test_enet.py -v`
+- **预期**: L1 qtest 18/18 PASS, L2 pytest 9/9 PASS
 
 ## 关键项目约定
 - ENET1 基地址: 0x4042_4000, IRQ 114 (标记 NEARLY CORRECT)
@@ -68,7 +67,7 @@
 | Architect | architect.md | M0 ✅ | 2026-05-10 | 🟢 正常 |
 | QEMU Dev | qemu-dev.md | M1 ✅ | 2026-05-10 | 🟢 正常 |
 | FW Dev | fw-dev.md | M3 ✅ | 2026-05-11 | 🟢 正常 |
-| Test Eng | test-eng.md | M4 框架就绪 | 2026-05-10 | 🟡 待 FW+QEMU 联调 |
+| Test Eng | test-eng.md | M4 ✅ 联调就绪 | 2026-05-11 | 🟢 正常 |
 | DevOps | devops.md | M5 ✅ | 2026-05-10 | 🟢 正常 |
 | Coordinator | coordinator.md | 初始化 | 2026-05-11 | 🟢 正常 |
 

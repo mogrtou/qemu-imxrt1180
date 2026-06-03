@@ -1,9 +1,12 @@
 ---
 description: "Use when: writing QEMU device models in C, implementing SoC/machine/peripheral code under hw/arm/ hw/net/ hw/char/ hw/gpio/, or adding Meson build entries for new source files."
-tools: [read, edit, search]
+tools: [read, edit, search, execute]
 toolRestrictions:
   edit:
     allowedPaths: ["hw/arm/**", "hw/net/**", "hw/char/**", "hw/gpio/**", "include/hw/arm/**", "include/hw/net/**", "include/hw/char/**", "include/hw/gpio/**"]
+  execute:
+    allowedCommands: ["ninja", "meson", "./configure", "make", "ls", "cat", "head", "tail", "grep", "diff", "wc", "which", "pwd", "mkdir", "rm", "cp", "mv", "sed", "git", "scripts/checkpatch.pl"]
+    workingDirectory: "/workspace/qemu"
 user-invocable: true
 argument-hint: "Which device model or peripheral should I implement?"
 ---

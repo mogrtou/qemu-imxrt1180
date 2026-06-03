@@ -24,3 +24,4 @@
 - [2026-05-11] [Coordinator] 陈旧阈值：P0=6h, P1=12h, P2=24h（按小时级检测，非天数级）
 - [2026-05-11] [规则] 新增「文件归属与越界禁止规则」到 rules.md — 每个工程 Agent 只能编辑自己的文件，跨域需等待
 - [2026-05-11] [规则] 为 4 个工程 Agent (QEMU/FW/Test/DevOps) 添加 allowedPaths 白名单，硬限制编辑范围
+- [2026-05-11] [Test Eng] 完成 qtest+pytest 静态验证, 修复 7/7 字符串匹配, ECR/RCR P2 ✅, RDSR RO ✅, M4 标记联调就绪

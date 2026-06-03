@@ -49,7 +49,7 @@ def firmware_enet(project_root):
     """
     fw_path = os.environ.get(
         "FW_ENET_ELF",
-        project_root / "firmware" / "build" / "imxrt1180_enet_demo.elf"
+        project_root / "firmware" / "build" / "firmware.elf"
     )
     path = Path(fw_path)
     if not path.exists():

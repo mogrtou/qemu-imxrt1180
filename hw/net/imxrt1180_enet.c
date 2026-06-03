@@ -28,6 +28,8 @@ static void imxrt1180_enet_realize(DeviceState *dev, Error **errp);
 static void imxrt1180_enet_class_init(ObjectClass *oc, void *data);
 static void imxrt1180_enet_instance_init(Object *obj);
 static void imxrt1180_enet_update_irq(IMXRT1180ENETState *s);
+static void enet_handle_rx(IMXRT1180ENETState *s);
+static void enet_handle_tx(IMXRT1180ENETState *s);
 
 /* ------------------------------------------------------------------ */
 /*  MDIO Frame Handling (MMFR register)                                 */

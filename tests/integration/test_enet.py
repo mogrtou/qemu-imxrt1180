@@ -101,7 +101,7 @@ class TestNetworkConnectivity:
         """
         # Wait for firmware to initialize networking
         found = qemu_with_kernel.wait_for_string(
-            "netif", timeout=30
+            "[LWIP] Init complete", timeout=30
         )
         assert found, "Firmware did not report network interface ready"
 
@@ -146,7 +146,7 @@ class TestNetworkConnectivity:
         This is a host-side check (may require admin on some OS).
         """
         found = qemu_with_kernel.wait_for_string(
-            "netif", timeout=30
+            "[LWIP] Init complete", timeout=30
         )
         assert found, "Firmware did not report network interface ready"
 

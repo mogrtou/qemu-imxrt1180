@@ -6,7 +6,9 @@ build/
 *.bin
 *.hex
 *.map
+*.log
 firmware/build/
+build_log.txt
 
 # QEMU source
 qemu/

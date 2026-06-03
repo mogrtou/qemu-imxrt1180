@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
+    python-is-python3 \
     # QEMU 必备依赖
     libglib2.0-dev \
     libpixman-1-dev \

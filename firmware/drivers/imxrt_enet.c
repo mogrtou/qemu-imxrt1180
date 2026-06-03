@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include "config.h"
 #include "imxrt_enet.h"
 #include "bal/config/evk_config.h"
 #include "lwip/netif.h"
@@ -65,6 +66,7 @@
  * ========================================================================== */
 static uint8_t g_mac_addr[6];
 static int g_tx_bd_head;        /* 下一个要填充的 TX BD */
+static int g_tx_bd_tail;        /* 下一个要回收的 TX BD (硬件完成后) */
 static int g_rx_bd_tail;        /* 下一个要检查的 RX BD */
 static int g_link_up;
 
@@ -77,6 +79,7 @@ static void enet_mdio_write(uint8_t phy_addr, uint8_t reg_addr, uint16_t data);
 static uint16_t enet_mdio_read(uint8_t phy_addr, uint8_t reg_addr);
 static void enet_init_bd_rings(void);
 static void enet_set_mac_addr(const uint8_t mac[6]);
+static void reclaim_tx_bds(void);
 
 /* ==========================================================================
  * 寄存器操作辅助函数
@@ -176,6 +179,7 @@ static void enet_init_bd_rings(void)
     ENET_REG(ENET_RDSR) = RX_BD_BASE;
 
     g_tx_bd_head = 0;
+    g_tx_bd_tail = 0;
     g_rx_bd_tail = 0;
 }
 
@@ -331,7 +335,14 @@ int imxrt_enet_init(struct netif *netif)
         uint16_t phyid1, phyid2;
         phyid1 = enet_mdio_read(ENET_PHY_ADDR, 0x02);
         phyid2 = enet_mdio_read(ENET_PHY_ADDR, 0x03);
+        DBG_PRINT("[ENET] PHY: DP83822\r\n");
+
         g_link_up = imxrt_enet_get_link_status();
+        if (g_link_up) {
+            DBG_PRINT("[ENET] PHY link up\r\n");
+        } else {
+            DBG_PRINT("[ENET] PHY link down\r\n");
+        }
 
         (void)phyid1;
         (void)phyid2;
@@ -357,7 +368,7 @@ int imxrt_enet_init(struct netif *netif)
         netif->output_ip6 = ethip6_output;
 #endif
         /* linkoutput 为 netconn/socket API 使用, Phase 1 使用 raw API */
-        netif->linkoutput = (netif_linkoutput_fn)imxrt_enet_output;
+        netif->linkoutput = imxrt_enet_output;
     }
 
     return 0;
@@ -366,6 +377,39 @@ int imxrt_enet_init(struct netif *netif)
 /* ==========================================================================
  * TX 发送路径
  * ========================================================================== */
+
+/**
+ * reclaim_tx_bds — 扫描并回收硬件已完成的 TX BD
+ *
+ * 扫描 g_tx_bd_tail 到 g_tx_bd_head 之间的 TX BD,
+ * 如果硬件已经清除 R 位（发送完成），则回收 BD（恢复为空闲状态）。
+ * 在 imxrt_enet_output 和 TXF ISR 中调用。
+ */
+static void reclaim_tx_bds(void)
+{
+    int count = 0;
+    while (count < ENET_TX_BD_COUNT) {
+        volatile imxrt_enet_bd_t *bd = TX_BD(g_tx_bd_tail);
+        uint16_t status = bd->status;
+
+        /* 如果硬件仍持有此 BD (R=1), 停止回收 */
+        if (status & ENET_BD_TX_R) {
+            break;
+        }
+
+        /* BD 已完成 — 交还给 CPU 空闲池 */
+        bd->status = (status & ENET_BD_TX_W);  /* 只保留 W 位 */
+        bd->length = 0;
+
+        /* 推进 tail */
+        if (status & ENET_BD_TX_W) {
+            g_tx_bd_tail = 0;
+        } else {
+            g_tx_bd_tail++;
+        }
+        count++;
+    }
+}
 
 /**
  * imxrt_enet_output — lwIP 链路层发送回调
@@ -383,7 +427,7 @@ int imxrt_enet_init(struct netif *netif)
  * @param p      包含完整以太网帧的 pbuf
  * @return       ERR_OK 成功, ERR_BUF/ERR_IF 失败
  */
-int imxrt_enet_output(struct netif *netif, struct pbuf *p)
+err_t imxrt_enet_output(struct netif *netif, struct pbuf *p)
 {
     volatile imxrt_enet_bd_t *bd;
     uint8_t *buf;
@@ -397,19 +441,22 @@ int imxrt_enet_output(struct netif *netif, struct pbuf *p)
         return ERR_IF;
     }
 
-    /* ── 1. 找到下一个可用 TX BD ── */
+    /* ── 1. 回收已完成的 TX BD ── */
+    reclaim_tx_bds();
+
+    /* ── 2. 找到下一个可用 TX BD ── */
     bd = TX_BD(g_tx_bd_head);
     if (bd->status & ENET_BD_TX_R) {
         /* ENET 仍持有此 BD, TX 环满 */
         return ERR_BUF;
     }
 
-    /* ── 2. 获取数据缓冲区 ── */
+    /* ── 3. 获取数据缓冲区 ── */
     buf = (uint8_t *)TX_BUF(g_tx_bd_head);
     total_len = 0;
     offset = 0;
 
-    /* ── 3. 复制 pbuf 链到缓冲区 ── */
+    /* ── 4. 复制 pbuf 链到缓冲区 ── */
     for (q = p; q != NULL; q = q->next) {
         if (offset + q->len > ENET_RX_BUFSIZE) {
             return ERR_BUF;  /* 帧太大 */
@@ -419,7 +466,7 @@ int imxrt_enet_output(struct netif *netif, struct pbuf *p)
         total_len += q->len;
     }
 
-    /* ── 4. 设置 BD ──
+    /* ── 5. 设置 BD ──
      * R=1 (ENET owns), L=1 (last in frame), TC=1 (append CRC)
      * W 位保持不变
      */
@@ -429,7 +476,7 @@ int imxrt_enet_output(struct netif *netif, struct pbuf *p)
                | ENET_BD_TX_L                           /* Last */
                | ENET_BD_TX_TC;                          /* CRC */
 
-    /* ── 5. 更新索引并触发 TX ── */
+    /* ── 6. 更新索引并触发 TX ── */
     if (bd->status & ENET_BD_TX_W) {
         g_tx_bd_head = 0;
     } else {
@@ -563,7 +610,8 @@ void ENET_IRQHandler(void)
 
     /* ── 3. 处理 TXF (发送帧完成) ── */
     if (pending & ENET_INT_TXF) {
-        /* TX 完成 — lwIP raw API 无需额外处理, 清标志即可 */
+        /* 回收已完成的 TX BD, 释放 BD 环空间 */
+        reclaim_tx_bds();
         ENET_REG(ENET_EIR) = ENET_INT_TXF;
     }
 

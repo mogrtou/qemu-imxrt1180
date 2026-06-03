@@ -13,6 +13,7 @@
 #define IMXRT_ENET_H
 
 #include <stdint.h>
+#include "lwip/err.h"
 
 /* 前向声明: 避免引入整个 lwIP 头文件 */
 struct netif;
@@ -142,7 +143,7 @@ int imxrt_enet_init(struct netif *netif);
  * @param p      pbuf 数据包
  * @return       ERR_OK 成功, 其他为错误
  */
-int imxrt_enet_output(struct netif *netif, struct pbuf *p);
+err_t imxrt_enet_output(struct netif *netif, struct pbuf *p);
 
 /**
  * imxrt_enet_input — 从 RX BD 环读取帧并提交给 lwIP
