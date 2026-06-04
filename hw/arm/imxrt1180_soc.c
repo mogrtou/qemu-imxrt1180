@@ -10,10 +10,12 @@
  */
 
 #include "qemu/osdep.h"
+#include "qapi/error.h"
 #include "qemu/log.h"
+#include "system/address-spaces.h"
+#include "system/system.h"
 #include "hw/arm/imxrt1180_soc.h"
 #include "hw/qdev-properties.h"
-#include "sysemu/sysemu.h"
 
 /* ------------------------------------------------------------------ */
 /*  Forward declarations                                                */

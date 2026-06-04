@@ -16,7 +16,6 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <string.h>
 #include "config.h"
 #include "imxrt_enet.h"
 #include "bal/config/evk_config.h"
