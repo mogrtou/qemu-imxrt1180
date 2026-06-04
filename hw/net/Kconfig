@@ -1,0 +1,9 @@
+# Kconfig — i.MX RT1180 ENET (appended to QEMU hw/net/Kconfig)
+
+config IMXRT1180_ENET
+    bool
+    select IMXRT1180_DP83822_PHY
+    select PTIMER
+
+config IMXRT1180_DP83822_PHY
+    bool

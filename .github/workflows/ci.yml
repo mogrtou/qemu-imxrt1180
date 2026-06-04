@@ -45,10 +45,15 @@ jobs:
           cp -r hw/net/imxrt1180_*.c qemu/hw/net/
           cp -r include/hw/arm/imxrt1180_*.h qemu/include/hw/arm/
           cp -r include/hw/net/imxrt1180_*.h qemu/include/hw/net/
-          # 合并 meson.build
+          # 合并 meson.build (hw)
           cat hw/arm/meson.build >> qemu/hw/arm/meson.build
           cat hw/net/meson.build >> qemu/hw/net/meson.build
-          cat tests/qtest/meson.build >> qemu/tests/qtest/meson.build
+          # 合并 Kconfig
+          cat hw/arm/Kconfig >> qemu/hw/arm/Kconfig
+          cat hw/net/Kconfig >> qemu/hw/net/Kconfig
+          # 注册 qtest — 插入到 qtests_arm 列表中
+          sed -i "/^\s*\['arm-cpu-features'/i\  (config_all_devices.has_key('CONFIG_IMXRT1180_ENET') ? ['imxrt1180-enet-test'] : []) + \\\\" \
+            qemu/tests/qtest/meson.build
           # 拷贝 qtest 源文件
           cp tests/qtest/imxrt1180-*.c qemu/tests/qtest/
 
@@ -116,7 +121,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            gcc-arm-none-eabi binutils-arm-none-eabi make
+            gcc-arm-none-eabi binutils-arm-none-eabi make python3
 
       - name: 构建固件
         run: |
