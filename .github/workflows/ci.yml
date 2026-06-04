@@ -126,8 +126,12 @@ jobs:
       - name: 构建固件
         run: |
           cd firmware
+          echo "=== Python $(python3 --version) ==="
+          echo "=== GCC $(arm-none-eabi-gcc --version | head -1) ==="
+          echo "=== Source files: ==="
+          ls startup.c main.c bal/bal.c drivers/imxrt_enet.c app/httpd_task.c 2>&1
           if [ -f build.py ]; then
-            python3 build.py
+            python3 build.py 2>&1
           else
             make clean || true
             make -j$(nproc)
