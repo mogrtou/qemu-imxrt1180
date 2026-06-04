@@ -92,7 +92,11 @@ jobs:
         run: |
           if [ -d "${{ env.QEMU_BUILD_DIR }}" ]; then
             cd ${{ env.QEMU_BUILD_DIR }}
-            ninja -j$(nproc)
+            ninja -j$(nproc) -k 0 2>&1 | tee /tmp/ninja.log; rc=${PIPESTATUS[0]}
+            if [ $rc -ne 0 ]; then
+              echo "=== BUILD FAILED (exit=$rc) ==="
+            fi
+            exit $rc
           else
             echo "::notice::QEMU 构建目录不存在，跳过 ninja"
           fi
@@ -126,16 +130,14 @@ jobs:
       - name: 构建固件
         run: |
           cd firmware
-          echo "=== Python $(python3 --version) ==="
-          echo "=== GCC $(arm-none-eabi-gcc --version | head -1) ==="
-          echo "=== Source files: ==="
-          ls startup.c main.c bal/bal.c drivers/imxrt_enet.c app/httpd_task.c 2>&1
-          if [ -f build.py ]; then
-            python3 build.py 2>&1
-          else
-            make clean || true
-            make -j$(nproc)
-          fi
+          echo "=== Python ==="
+          python3 --version 2>&1 || echo "NO PYTHON3"
+          echo "=== ARM GCC ==="
+          which arm-none-eabi-gcc 2>&1 || echo "NOT IN PATH"
+          ls -la /usr/bin/arm-none-eabi-* 2>&1 || echo "NO ARM TOOLS IN /usr/bin"
+          dpkg -L gcc-arm-none-eabi 2>&1 | head -10 || echo "PKG NOT INSTALLED"
+          echo "=== Build ==="
+          python3 build.py 2>&1
 
       - name: 上传固件产物
         uses: actions/upload-artifact@v4
