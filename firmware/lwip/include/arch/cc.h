@@ -10,6 +10,9 @@
 
 #include <stdint.h>
 
+/* ── 禁用不存在的系统头文件 (bare-metal) ── */
+#define LWIP_NO_INTTYPES_H  1
+
 /* ── 基础类型 ── */
 typedef uint8_t   u8_t;
 typedef int8_t    s8_t;

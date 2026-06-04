@@ -37,7 +37,6 @@ static void enet_handle_tx(IMXRT1180ENETState *s);
 static void enet_handle_mdio_write(IMXRT1180ENETState *s)
 {
     uint32_t mmfr = s->mmfr;
-    uint8_t phy_addr = (mmfr >> 23) & 0x1F;
     uint8_t reg_addr = (mmfr >> 18) & 0x1F;
     uint8_t op = (mmfr >> 28) & 0x3;
     uint16_t data = mmfr & 0xFFFF;
@@ -467,8 +466,9 @@ static void enet_bd_write(hwaddr bd_ptr, const IMXRT1180ENETBD *bd)
 
 /**
  * enet_bd_write_full: Write complete BD (status + length + data_ptr)
+ * Phase 1: used by TX+RX DMA, kept for Phase 2 multi-BD support
  */
-static void enet_bd_write_full(hwaddr bd_ptr, const IMXRT1180ENETBD *bd)
+static void __attribute__((unused)) enet_bd_write_full(hwaddr bd_ptr, const IMXRT1180ENETBD *bd)
 {
     uint32_t words[2];
 
@@ -605,7 +605,7 @@ static void enet_handle_rx(IMXRT1180ENETState *s)
 /* ------------------------------------------------------------------ */
 /*  Network Backend Callbacks                                            */
 /* ------------------------------------------------------------------ */
-static int imxrt1180_enet_can_receive(NetClientState *nc)
+static bool imxrt1180_enet_can_receive(NetClientState *nc)
 {
     IMXRT1180ENETState *s = qemu_get_nic_opaque(nc);
 
@@ -758,7 +758,7 @@ static void imxrt1180_enet_realize(DeviceState *dev, Error **errp)
 
     s->nic = qemu_new_nic(&net_imxrt1180_enet_info, &s->conf,
                           object_get_typename(OBJECT(dev)),
-                          dev->id, s);
+                          dev->id, NULL, s);
 
     qemu_format_nic_info_str(qemu_get_queue(s->nic), s->macaddr);
 }
@@ -827,7 +827,7 @@ static void imxrt1180_enet_class_init(ObjectClass *oc, void *data)
     DeviceClass *dc = DEVICE_CLASS(oc);
 
     dc->realize = imxrt1180_enet_realize;
-    dc->reset = imxrt1180_enet_reset;
+    device_class_set_legacy_reset(dc, imxrt1180_enet_reset);
     dc->vmsd = &vmstate_imxrt1180_enet;
     set_bit(DEVICE_CATEGORY_NETWORK, dc->categories);
     device_class_set_props(dc, imxrt1180_enet_properties);
