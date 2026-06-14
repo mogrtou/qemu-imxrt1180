@@ -15,6 +15,12 @@
 
 #include <stdint.h>
 
+/* Provided by startup.c (nostdlib) */
+extern void *memcpy(void *dest, const void *src, unsigned int n);
+extern int snprintf(char *buf, unsigned int size, const char *fmt, ...);
+extern unsigned int strlen(const char *s);
+extern int strncmp(const char *s1, const char *s2, unsigned int n);
+
 #include "FreeRTOS.h"
 #include "task.h"
 

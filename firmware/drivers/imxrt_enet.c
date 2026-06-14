@@ -17,6 +17,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "config.h"
+
+/* Provided by startup.c (nostdlib) */
+extern void *memcpy(void *dest, const void *src, unsigned int n);
 #include "imxrt_enet.h"
 #include "bal/config/evk_config.h"
 #include "lwip/netif.h"
