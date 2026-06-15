@@ -52,9 +52,9 @@ jobs:
           cat hw/arm/Kconfig >> qemu/hw/arm/Kconfig
           cat hw/net/Kconfig >> qemu/hw/net/Kconfig
           # 注册 qtest — 插入到 qtests_arm 列表中
-          sed -i "/^\s*\['arm-cpu-features'/i\  (config_all_devices.has_key('CONFIG_IMXRT1180_ENET') ? ['imxrt1180-enet-test'] : []) + \\\\" \
-            qemu/tests/qtest/meson.build
-          # 拷贝 qtest 源文件 (Phase 2: needs v9.2.0 API compat fixes)
+          # (Phase 2: needs v9.2.0 API compat fixes in the test)
+          # sed -i "/^\s*\['arm-cpu-features'/i\  (config_all_devices.has_key('CONFIG_IMXRT1180_ENET') ? ['imxrt1180-enet-test'] : []) + \\\\" \
+          #   qemu/tests/qtest/meson.build
           # cp tests/qtest/imxrt1180-*.c qemu/tests/qtest/
 
       - name: 安装 QEMU 构建依赖
