@@ -109,6 +109,19 @@ SOURCES = [
     "lwip/src/arch/sys_arch.c",
 ]
 
+# 查找 ARM GCC 系统头文件路径 (CI 上 -ffreestanding 可能阻止搜索)
+def _find_arm_sysroot():
+    try:
+        result = subprocess.run([CC, "-print-sysroot"], capture_output=True, text=True, check=True)
+        sysroot = result.stdout.strip()
+        if sysroot and os.path.isdir(sysroot):
+            inc = os.path.join(sysroot, "include")
+            if os.path.isdir(inc):
+                return ["-isystem", inc]
+    except Exception:
+        pass
+    return []
+
 # 编译标志
 CFLAGS = [
     "-mcpu=cortex-m7", "-mthumb", "-mfloat-abi=softfp", "-mfpu=fpv5-d16",
@@ -128,7 +141,7 @@ CFLAGS = [
     "-Ilwip/src/arch",
     "-Imbedtls/include",
     "-Imbedtls/include/mbedtls",
-]
+] + _find_arm_sysroot()
 
 # 链接标志
 LDFLAGS = [
