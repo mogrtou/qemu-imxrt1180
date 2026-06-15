@@ -24,7 +24,7 @@ jobs:
   # ========================================================================
   build-qemu:
     name: Build QEMU (arm-softmmu)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -116,7 +116,7 @@ jobs:
   # ========================================================================
   build-firmware:
     name: Build Firmware
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -146,7 +146,7 @@ jobs:
   # ========================================================================
   test-qtest:
     name: QTest Unit Tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     needs: [build-qemu]
     steps:
       - name: 检出代码
@@ -188,7 +188,7 @@ jobs:
   # ========================================================================
   test-integration:
     name: Integration Tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     needs: [build-qemu, build-firmware]
     continue-on-error: true  # 集成测试失败不阻塞 PR
     steps:
@@ -231,7 +231,7 @@ jobs:
   # ========================================================================
   coverage:
     name: Code Coverage
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     needs: []
     steps:
       - name: 检出代码
