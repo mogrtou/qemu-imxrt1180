@@ -12,6 +12,7 @@
 #include "hw/arm/armv7m.h"
 #include "hw/net/imxrt1180_enet.h"
 #include "hw/net/imxrt1180_dp83822_phy.h"
+#include "hw/clock.h"
 
 #define TYPE_IMXRT1180_SOC "imxrt1180-soc"
 OBJECT_DECLARE_SIMPLE_TYPE(IMXRT1180SoCState, IMXRT1180_SOC)
@@ -55,6 +56,9 @@ struct IMXRT1180SoCState {
     /*< public >*/
     /* ARMv7-M container (CPU + NVIC + SysTick + MPU) */
     ARMv7MState armv7m;
+
+    /* System clock for ARMv7M (required by v9.2.0+) */
+    Clock *sysclk;
 
     /* Memory regions */
     MemoryRegion itcm;

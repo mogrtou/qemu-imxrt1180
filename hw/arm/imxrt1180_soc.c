@@ -16,6 +16,9 @@
 #include "sysemu/sysemu.h"
 #include "hw/arm/imxrt1180_soc.h"
 #include "hw/qdev-properties.h"
+#include "target/arm/cpu-qom.h"
+#include "hw/arm/boot.h"
+#include "hw/qdev-clock.h"
 
 /* ------------------------------------------------------------------ */
 /*  Forward declarations                                                */
@@ -34,20 +37,28 @@ static void imxrt1180_soc_realize(DeviceState *dev, Error **errp)
     SysBusDevice *sbd;
     Object *obj;
 
+    /* SoC realize */
+
     /* ---- 1. Initialize ARMv7-M Core ---- */
+    object_property_set_link(OBJECT(&s->armv7m), "memory",
+                             OBJECT(get_system_memory()), &error_abort);
     object_property_set_str(OBJECT(&s->armv7m), "cpu-type", s->cpu_type,
                             &error_abort);
     object_property_set_int(OBJECT(&s->armv7m), "num-irq", IMXRT1180_NUM_IRQS,
                             &error_abort);
-    if (s->kernel_filename) {
-        object_property_set_str(OBJECT(&s->armv7m), "kernel",
-                                s->kernel_filename, &error_abort);
+    qdev_connect_clock_in(DEVICE(&s->armv7m), "cpuclk", s->sysclk);
+
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->armv7m), errp)) {
+        return;
     }
 
-    qdev_realize(armv7m_dev, NULL, &error_abort);
+    /* Load kernel after ARMv7M realized (v9.2.0: no "kernel" property) */
+    if (s->kernel_filename) {
+        armv7m_load_kernel(ARM_CPU(first_cpu), s->kernel_filename, 0,
+                           IMXRT1180_ITCM_SIZE);
+    }
 
     /* ---- 2. Create Memory Regions ---- */
-
     /* ITCM: 0x0000_0000, 256KB */
     memory_region_init_ram(&s->itcm, OBJECT(dev), "imxrt1180.itcm",
                            IMXRT1180_ITCM_SIZE, &error_abort);
@@ -69,22 +80,18 @@ static void imxrt1180_soc_realize(DeviceState *dev, Error **errp)
     /* ---- 3. Create ENET1 ---- */
     obj = object_new(TYPE_IMXRT1180_ENET);
     object_property_set_uint(obj, "phy-addr", 0, &error_abort);
+    object_property_add_child(OBJECT(dev), "enet1", obj);
     sysbus_realize(SYS_BUS_DEVICE(obj), &error_abort);
 
-    /* Map ENET1 MMIO to peripheral space */
     sbd = SYS_BUS_DEVICE(obj);
     memory_region_add_subregion(get_system_memory(),
                                 IMXRT1180_ENET1_BASE,
                                 sysbus_mmio_get_region(sbd, 0));
 
-    /* Connect ENET1 IRQ → NVIC 114 */
     sysbus_connect_irq(sbd, 0,
                        qdev_get_gpio_in(armv7m_dev, IMXRT1180_ENET1_IRQ));
 
-    /* Store reference */
-    object_property_add_child(OBJECT(dev), "enet1", obj);
     s->enet1 = IMXRT1180_ENET(obj);
-
     /* ---- 4. Phase 2: ENET2 at IRQ 116, base TBD ---- */
 }
 
@@ -111,8 +118,15 @@ static void imxrt1180_soc_instance_init(Object *obj)
 {
     IMXRT1180SoCState *s = IMXRT1180_SOC(obj);
 
+    /* Initialize embedded objects */
+    object_initialize_child(obj, "armv7m", &s->armv7m, TYPE_ARMV7M);
+
+    /* Create system clock */
+    s->sysclk = clock_new(obj, "sysclk");
+    clock_set_hz(s->sysclk, 600000000); /* 600 MHz for i.MX RT1180 */
+
     /* Default CPU type */
-    s->cpu_type = g_strdup("cortex-m7");
+    s->cpu_type = g_strdup(ARM_CPU_TYPE_NAME("cortex-m7"));
     s->kernel_filename = NULL;
 }
 

@@ -14,6 +14,7 @@
 #include "hw/boards.h"
 #include "net/net.h"
 #include "sysemu/sysemu.h"
+#include "target/arm/cpu-qom.h"
 
 /* ------------------------------------------------------------------ */
 /*  Machine Init                                                        */
@@ -22,29 +23,17 @@ static void imxrt1180_evk_init(MachineState *machine)
 {
     IMXRT1180SoCState *soc;
 
-    /* Create SoC as a child of the machine */
     soc = IMXRT1180_SOC(object_new(TYPE_IMXRT1180_SOC));
     object_property_add_child(OBJECT(machine), "soc", OBJECT(soc));
-
-    /* Set CPU type */
     if (machine->cpu_type) {
         object_property_set_str(OBJECT(soc), "cpu-type",
                                 machine->cpu_type, &error_abort);
     }
-
-    /* Set kernel (firmware) if provided */
     if (machine->kernel_filename) {
         object_property_set_str(OBJECT(soc), "kernel",
                                 machine->kernel_filename, &error_abort);
     }
-
-    /* Realize the SoC (creates CPU, memories, peripherals) */
     sysbus_realize(SYS_BUS_DEVICE(soc), &error_abort);
-
-    /* ---- Connect ENET1 to network backend ---- */
-    if (soc->enet1) {
-        qdev_set_nic_properties(DEVICE(soc->enet1), &nd_table[0]);
-    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -56,7 +45,7 @@ static void imxrt1180_evk_class_init(ObjectClass *oc, void *data)
 
     mc->desc = "NXP i.MX RT1180 Evaluation Kit (armv7m)";
     mc->init = imxrt1180_evk_init;
-    mc->default_cpu_type = "cortex-m7";
+    mc->default_cpu_type = ARM_CPU_TYPE_NAME("cortex-m7");
     mc->min_cpus = 1;
     mc->max_cpus = 1;
 }
