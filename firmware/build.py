@@ -112,7 +112,7 @@ SOURCES = [
 # 编译标志
 CFLAGS = [
     "-mcpu=cortex-m7", "-mthumb", "-mfloat-abi=softfp", "-mfpu=fpv5-d16",
-    "-ffreestanding", "-nostdlib",
+    "-ffreestanding",
     "-O0", "-g3", "-Wall", "-Wextra",
     "-Wno-unused-function", "-Wno-unused-parameter",
     "-Wno-missing-field-initializers",
