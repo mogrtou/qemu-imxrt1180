@@ -81,6 +81,7 @@ static void imxrt1180_soc_realize(DeviceState *dev, Error **errp)
     obj = object_new(TYPE_IMXRT1180_ENET);
     object_property_set_uint(obj, "phy-addr", 0, &error_abort);
     object_property_add_child(OBJECT(dev), "enet1", obj);
+    qemu_configure_nic_device(DEVICE(obj), true, NULL);
     sysbus_realize(SYS_BUS_DEVICE(obj), &error_abort);
 
     sbd = SYS_BUS_DEVICE(obj);
