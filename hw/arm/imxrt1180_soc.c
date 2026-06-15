@@ -52,13 +52,7 @@ static void imxrt1180_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
 
-    /* Load kernel after ARMv7M realized (v9.2.0: no "kernel" property) */
-    if (s->kernel_filename) {
-        armv7m_load_kernel(ARM_CPU(first_cpu), s->kernel_filename, 0,
-                           IMXRT1180_ITCM_SIZE);
-    }
-
-    /* ---- 2. Create Memory Regions ---- */
+    /* ---- 2. Create Memory Regions (before loading kernel!) ---- */
     /* ITCM: 0x0000_0000, 256KB */
     memory_region_init_ram(&s->itcm, OBJECT(dev), "imxrt1180.itcm",
                            IMXRT1180_ITCM_SIZE, &error_abort);
@@ -76,6 +70,12 @@ static void imxrt1180_soc_realize(DeviceState *dev, Error **errp)
                            IMXRT1180_OCRAM_SIZE, &error_abort);
     memory_region_add_subregion(get_system_memory(),
                                 IMXRT1180_OCRAM_BASE, &s->ocram);
+
+    /* Load kernel into ITCM (must be after memory region creation) */
+    if (s->kernel_filename) {
+        armv7m_load_kernel(ARM_CPU(first_cpu), s->kernel_filename, 0,
+                           IMXRT1180_ITCM_SIZE);
+    }
 
     /* ---- 3. Create ENET1 ---- */
     obj = object_new(TYPE_IMXRT1180_ENET);
