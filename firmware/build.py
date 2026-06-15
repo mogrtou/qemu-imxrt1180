@@ -40,7 +40,6 @@ SOURCES = [
     # 核心启动
     "startup.c",
     "main.c",
-    "systick_demo.c",
 
     # BAL 板级抽象层
     "bal/bal.c",

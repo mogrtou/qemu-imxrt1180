@@ -107,4 +107,19 @@
  * ========================================================================== */
 /* NVIC 寄存器定义 — 由官方的 portmacro.h 提供, 这里不重复定义 */
 
+/*
+ * FreeRTOS → CMSIS 中断向量名映射
+ *
+ * FreeRTOS port.c 定义了:
+ *   vPortSVCHandler     → 需要映射到 SVC_Handler
+ *   xPortPendSVHandler  → 需要映射到 PendSV_Handler
+ *   xPortSysTickHandler → 需要映射到 SysTick_Handler (由 systick_demo.c 调用)
+ */
+#define vPortSVCHandler     SVC_Handler
+#define xPortPendSVHandler  PendSV_Handler
+#define xPortSysTickHandler SysTick_Handler
+
+/* SysTick 时钟源: 使用 CPU 时钟 (ARM_CM7 port.c 缺少这个宏) */
+#define portNVIC_SYSTICK_CLK_BIT_CONFIG  portNVIC_SYSTICK_CLK_BIT
+
 #endif /* FREERTOS_CONFIG_H */

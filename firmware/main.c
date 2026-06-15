@@ -120,7 +120,8 @@ void sys_tick_init(void)
 
     *syst_cvr = 0;          /* 清零当前值 */
     *syst_rvr = reload;     /* 设置重载值 */
-    *syst_csr = 0x7;        /* 使能: CLKSOURCE=1 (CPU clock), TICKINT=1, ENABLE=1 */
+    /* 不使能 SysTick — FreeRTOS vTaskStartScheduler() 会通过
+     * vPortSetupTimerInterrupt() 在合适的时机使能 */
 }
 
 /* ==========================================================================
@@ -163,19 +164,15 @@ int main(void)
     sys_tick_init();
     DBG_PRINT("[INIT] SysTick configured (1 kHz)\r\n");
 
-    /* ── 2. 创建 lwIP 初始化任务 ──
-     * 此任务负责 ENET 驱动初始化、lwIP 协议栈启动、DHCP 获取 IP
-     * 启动成功后创建 httpd_task
-     */
+    /* ── 2. 创建 lwIP 初始化任务 ── */
     BaseType_t ret = xTaskCreate(
         lwip_init_task,         /* 任务函数 */
         "lwip_init",            /* 任务名称 */
         1024,                   /* 栈大小 (words) */
         NULL,                   /* 参数 */
-        2,                      /* 优先级 (0-7, 2=中等) */
-        NULL                    /* 任务句柄 (不需要) */
+        2,                      /* 优先级 */
+        NULL
     );
-
     if (ret != pdPASS) {
         DBG_PRINT("ERROR: Failed to create lwip_init_task\r\n");
         while (1) { }
@@ -191,6 +188,24 @@ int main(void)
     /* 不应该到达这里 */
     while (1) { }
     return 0;
+}
+
+/* ==========================================================================
+ * test_heartbeat_task — 验证调度器是否工作的简单任务
+ * ========================================================================== */
+void test_heartbeat_task(void *arg)
+{
+    (void)arg;
+    DBG_PRINT("[TEST] Heartbeat task running!\r\n");
+    int count = 0;
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));  /* 等 1 秒 */
+        count++;
+        /* 每 5 秒输出一次 */
+        if ((count % 5) == 0) {
+            DBG_PRINT("[TEST] Alive: 5 more seconds\r\n");
+        }
+    }
 }
 
 /* ==========================================================================
