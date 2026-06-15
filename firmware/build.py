@@ -112,6 +112,7 @@ SOURCES = [
 # 查找 ARM GCC 系统头文件路径 (CI 上 -ffreestanding 可能阻止搜索)
 def _find_arm_sysroot():
     try:
+        # Method 1: ask GCC for its sysroot
         result = subprocess.run([CC, "-print-sysroot"], capture_output=True, text=True, check=True)
         sysroot = result.stdout.strip()
         if sysroot and os.path.isdir(sysroot):
@@ -120,6 +121,10 @@ def _find_arm_sysroot():
                 return ["-isystem", inc]
     except Exception:
         pass
+    # Method 2: common paths on Ubuntu/Debian
+    for path in ["/usr/lib/arm-none-eabi/include", "/usr/arm-none-eabi/include"]:
+        if os.path.isdir(path):
+            return ["-isystem", path]
     return []
 
 # 编译标志
