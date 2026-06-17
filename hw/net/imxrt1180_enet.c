@@ -252,6 +252,7 @@ static void imxrt1180_enet_write(void *opaque, hwaddr addr, uint64_t val,
         s->tdar = val;
         /* Writing 1 activates TX BD ring scanning */
         if (val & 1) {
+            fprintf(stderr, "DEBUG TDAR=1, s->nic=%p\n", (void*)s->nic);
             enet_handle_tx(s);
         }
         break;
@@ -537,7 +538,9 @@ static bool enet_do_tx_bd(IMXRT1180ENETState *s)
 
     /* Send to QEMU network backend (TAP / SLIRP) */
     if (s->nic && length > 0) {
-        qemu_send_packet(qemu_get_queue(s->nic), tx_buf, length);
+        NetClientState *nc = qemu_get_queue(s->nic);
+        fprintf(stderr, "DEBUG ENET TX: len=%u peer=%p\n", length, (void*)(nc ? nc->peer : NULL));
+        qemu_send_packet(nc, tx_buf, length);
     }
 
     /* Update BD: clear Ready, preserve wrap/last bits */

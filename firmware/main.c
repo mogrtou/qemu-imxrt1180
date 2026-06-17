@@ -158,7 +158,7 @@ int main(void)
 {
     DBG_PRINT("\r\n=== i.MX RT1180 Network Firmware (M3) ===\r\n");
     DBG_PRINT("Build: " __DATE__ " " __TIME__ "\r\n");
-    DBG_PRINT("Stack: FreeRTOS 10.6.2 + lwIP 2.2.1\r\n");
+    DBG_PRINT("Stack: FreeRTOS 10.6.2 + lwIP 2.2.1 (STATIC_IP)\r\n");
 
     /* ── 1. 配置 SysTick ── */
     sys_tick_init();
@@ -265,6 +265,7 @@ void lwip_init_task(void *arg)
 
     /* ── 4. 配置 IP ── */
 #if LWIP_IPADDR_STATIC
+#define STATIC_IP_ACTIVE 1
     IP4_ADDR(&ipaddr,
              LWIP_IPADDR0, LWIP_IPADDR1, LWIP_IPADDR2, LWIP_IPADDR3);
     IP4_ADDR(&netmask,
@@ -273,8 +274,7 @@ void lwip_init_task(void *arg)
              LWIP_GW0, LWIP_GW1, LWIP_GW2, LWIP_GW3);
 
     netif_set_addr(&g_enet_netif, &ipaddr, &netmask, &gw);
-    DBG_PRINT("[LWIP] Static IP: %d.%d.%d.%d\r\n",
-              LWIP_IPADDR0, LWIP_IPADDR1, LWIP_IPADDR2, LWIP_IPADDR3);
+    DBG_PRINT("[LWIP] Static IP configured\r\n");
 #else
     /* DHCP 配置 */
     IP4_ADDR(&ipaddr, 0, 0, 0, 0);

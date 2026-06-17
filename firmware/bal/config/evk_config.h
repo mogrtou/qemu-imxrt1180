@@ -56,7 +56,7 @@
 /* ==========================================================================
  * lwIP 网络配置 (lwipopts.h 引用)
  * ========================================================================== */
-#define LWIP_IPADDR_STATIC      0               /* 0=DHCP, 1=Static IP */
+#define LWIP_IPADDR_STATIC      1               /* 0=DHCP, 1=Static IP */
 #define LWIP_IPADDR0            10
 #define LWIP_IPADDR1            0
 #define LWIP_IPADDR2            2
